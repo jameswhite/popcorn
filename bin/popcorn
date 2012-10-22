@@ -124,24 +124,7 @@ cat<<EOH
 ################################################################################
 ################################################################################
 EOH
-exit 0;
 export http_proxy=http://squid.eftdomain.net:3128
-
-cat<<EOH
-################################################################################
-# Install Cfengine
-################################################################################
-EOH
-dpkg -l | grep -q "^ii "| grep "cfengine-community" || \
-  (
-    if [ ! -f "/var/tmp/cfengine-community_3.2.1-1_debian6_i386.deb" ];then 
-        wget -qO /var/tmp/cfengine-community_3.2.1-1_debian6_i386.deb \
-             http://packages.lab.eftdomain.net/working/debian-squeeze-os-i386/cfengine-community_3.2.1-1_debian6_i386.deb
-    fi
-    dpkg -i /var/tmp/cfengine-community_3.2.1-1_debian6_i386.deb
-    wget -qO - cfengine.lab/inputs | bash
-    cf-agent -K
-  )
 
 cat<<EOH
 ################################################################################
@@ -170,7 +153,7 @@ EOH
 (
   cd /var/cache/git
   if [ ! -d /var/cache/git/aufs2-standalone ]; then
-          git clone https://${GITHUB_AUTH_TOKEN}:x-oauth-basic@github.com/fapestniegd/aufs2-standalone.git
+          git clone https://${GITHUB_AUTH_TOKEN}github.com/fapestniegd/aufs2-standalone.git
   else
       cd /var/cache/git/aufs2-standalone; git pull
   fi 
@@ -181,6 +164,8 @@ EOH
       git checkout ${v} || git checkout -b ${v} origin/${v}
   done
 )
+
+exit 0;
 
 cat<<EOH
 ################################################################################
