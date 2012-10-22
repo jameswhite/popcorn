@@ -31,6 +31,7 @@ if [ "$(hostname -s)" != "popcorn" ]; then
     # ensure we have a vagrand box running headless named popcorn_*
     POPCORN_PID=$(ps -ef | grep 'VBoxHeadless --comment popcorn_' | grep -v grep | awk '{print $2}')
     if [ -z "${POPCORN_PID}" ] ; then
+        echo "creating popcorn vm"
         SCRIPTDIR=$(cd $(dirname $0); pwd)
         SCRIPTNAME=$(basename $0)
         if [ ! -d ~/.vagrant.d/boxes/popcorn ]; then
@@ -44,6 +45,8 @@ if [ "$(hostname -s)" != "popcorn" ]; then
         if [ -z "$(ps -ef | grep 'VBoxHeadless --comment popcorn_' | grep -v grep)" ]; then 
             ( cd ~/vm/vagrant/popcorn; vagrant up )
         fi
+    else
+        echo "popcorn vm already exists"
     fi
 exit 0;
     ( cd ~/vm/vagrant/popcorn;echo "sudo hostname popcorn"| vagrant ssh -- -A 2>/dev/null )
