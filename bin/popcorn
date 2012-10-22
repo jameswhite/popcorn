@@ -67,6 +67,8 @@ if [ "$(hostname -s)" != "popcorn" ]; then
              -o StrictHostKeyChecking=no           \
              -o LogLevel=ERROR                     \
              -o IdentitiesOnly=yes                 \
+             -i ${HOME}/.ssh/id_dsa.pub            \
+             -i ${HOME}/.ssh/id_rsa.pub            \
              ~/.popcornrc root@127.0.0.1:/root/.popcornrc
     fi
     # Copy this script to the virtualbox and sudo execute it...
