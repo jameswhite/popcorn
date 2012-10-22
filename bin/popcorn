@@ -234,7 +234,6 @@ else
     echo "Success: ${KERNEL}.${KSUBVER} && ${branch} : ${PATCH_EXIT}"
 fi
 
-exit 0;
 
 cat<<EOH
 ################################################################################
@@ -243,21 +242,12 @@ cat<<EOH
 EOH
 OLDCONFIG_EXIT=0; # if we don't run it, assume it exited 0
 if [ ! -f /var/tmp/config-${KERNEL}.${KSUBVER} ]; then
-    export GISTROOT=$(mktemp -d /tmp/GIST.XXXX)
-    if [ -z "${SSH_PROXY}" ]; then 
-        ( cd ${GISTROOT} ; git clone git://gist.github.com/${CONFIG_GIST}.git )
-    else 
-        ssh -fNAL9418:gist.github.com:9418 ${SSH_PROXY} &
-        SSHPID=$!
-        git clone git://127.0.0.1/${CONFIG_GIST}.git 
-        kill -9 ${SSHPID}
-    fi
-    if [ -f ${GISTROOT}/${CONFIG_GIST}/config-${KERNEL}.${KSUBVER} ]; then
-        echo "Using config-${KERNEL}.${KSUBVER} from gist-${CONFIG_GIST}/config-${KERNEL}.${KSUBVER}"
-        cp ${GISTROOT}/${CONFIG_GIST}/config-${KERNEL}.${KSUBVER} ${BUILD_ROOT}/linux/.config
+    if [ -f /var/cache/popcorn/conf/config-${KERNEL}.${KSUBVER} ]; then
+        echo "Using config-${KERNEL}.${KSUBVER} from popcorn/conf"
+        cp /var/cache/popcorn/conf/config-${KERNEL}.${KSUBVER} ${BUILD_ROOT}/linux/.config
     else
         echo "no specific config found. Using default config"
-        cp ${GISTROOT}/${CONFIG_GIST}/config ${BUILD_ROOT}/linux/.config
+        cp /var/cache/popcorn/conf/config.orig ${BUILD_ROOT}/linux/.config
         (cd $BUILD_ROOT/linux; make oldconfig)
         OLDCONFIG_EXIT=$?
         # copy the new one with an append version line to /var/tmp
@@ -302,6 +292,8 @@ if [ ${OLDCONFIG_EXIT} -ne 0 ];then
           
     ) 
 fi
+
+exit 0;
 
 cat<<EOH
 ################################################################################
