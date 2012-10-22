@@ -72,17 +72,18 @@ if [ "$(hostname -s)" != "popcorn" ]; then
              ~/.popcornrc root@127.0.0.1:/root/.popcornrc
     fi
     # Copy this script to the virtualbox and sudo execute it...
-     scp -P 2222                               \
-         -o UserKnownHostsFile=/dev/null       \
-         -o StrictHostKeyChecking=no           \
-         -o LogLevel=ERROR                     \
-         -o IdentitiesOnly=yes                 \
+     scp -P 2222                                    \
+         -o UserKnownHostsFile=/dev/null            \
+         -o StrictHostKeyChecking=no                \
+         -o LogLevel=ERROR                          \
+         -o IdentitiesOnly=yes                      \
          -i ${HOME}/.vagrant.d/insecure_private_key \
         ${SCRIPTDIR}/${SCRIPTNAME} vagrant@127.0.0.1:${SCRIPTNAME}
     ( cd ~/vm/vagrant/popcorn; echo "ssh-keyscan -t dsa,rsa localhost >> ~/.ssh/known_hosts"|vagrant ssh -- -A 2>/dev/null  ) 
     ( cd ~/vm/vagrant/popcorn; echo "ssh -A root@localhost /home/vagrant/${SCRIPTNAME}"|vagrant ssh -- -A 2> run.err | tee run.out  ) 
 
 exit 0;
+echo "I RAN"
 cat<<EOF
 ################################################################################
 #                            Return of Control                                 #
