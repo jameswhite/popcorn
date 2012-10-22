@@ -97,18 +97,18 @@ cat<<EOF
 #                            Return of Control                                 #
 ################################################################################
 EOF
-    export BHASH=$(grep "BUNDLE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
-    export MHASH=$(grep "MODULE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
-    export DATETIME=$(grep "DATETIME=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
-    export SHIP='true'
-    if [ -z "${BHASH}" ]; then SHIP='false'; fi
-    if [ -z "${MHASH}" ]; then SHIP='false'; fi
-    if [ -z "${DATETIME}" ]; then SHIP='false'; fi
-    sed -e "s/~BHASH~/${BHASH}/g" -e "s/~MHASH~/${MHASH}/g" -e "s/~DATETIME~/${DATETIME}/g" -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" \
-        ${SCRIPTDIR}/ro_update.tpl > ${SCRIPTDIR}/ro_update_${DATETIME}
-    if [ "${SHIP}" == "true" ] ; then
-        curl --insecure -X PUT -T "${SCRIPTDIR}/ro_update_${DATETIME}" "https://stash.eftdomain.net/kernel_bundles/ro_update_${DATETIME}"
-    fi
+#   export BHASH=$(grep "BUNDLE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+#   export MHASH=$(grep "MODULE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+#   export DATETIME=$(grep "DATETIME=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+#   export SHIP='true'
+#   if [ -z "${BHASH}" ]; then SHIP='false'; fi
+#   if [ -z "${MHASH}" ]; then SHIP='false'; fi
+#   if [ -z "${DATETIME}" ]; then SHIP='false'; fi
+#   sed -e "s/~BHASH~/${BHASH}/g" -e "s/~MHASH~/${MHASH}/g" -e "s/~DATETIME~/${DATETIME}/g" -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" \
+#       ${SCRIPTDIR}/ro_update.tpl > ${SCRIPTDIR}/ro_update_${DATETIME}
+#   if [ "${SHIP}" == "true" ] ; then
+#       curl --insecure -X PUT -T "${SCRIPTDIR}/ro_update_${DATETIME}" "https://stash.eftdomain.net/kernel_bundles/ro_update_${DATETIME}"
+#   fi
 #    ( cd ~/vm/vagrant/popcorn; vagrant halt )
 #    ( cd ~/vm/vagrant/popcorn; yes | vagrant destroy --force )
     exit 0;
