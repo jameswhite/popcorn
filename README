@@ -1,0 +1,6 @@
+This is just a utility I use to automate building custom kernels on debian stable.
+
+custom kernels for aufs-read-write-over-root-on-cryptoloop and other insane layouts.
+
+It uses a vagrant vm to do the actual build, then pushes the packages, as well as the initrd, vmlinux, lib/modules/tarball, and config to a stash  (mod_dav) server.
+It also references other repositories on github to get patches to the kernel (aufs is unstable on the default linux kernel)

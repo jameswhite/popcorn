@@ -1,0 +1,394 @@
+#!/bin/bash
+cat<<EOH
+################################################################################
+# Set our versions
+################################################################################
+EOH
+#export KERNEL=2.6.32
+#export KSUBVER=59
+#export AUFS_BRANCH=aufs2.1-32
+
+#export KERNEL=2.6.34
+#export KSUBVER=12
+#export AUFS_BRANCH=aufs2.1-34
+
+export KERNEL=2.6.35
+export KSUBVER=13
+export AUFS_BRANCH=aufs2.1-35
+
+export CONFIG_GIST="446120"
+export BUILD_ROOT="/opt/local/src/"
+
+export SSH_PROXY="jameswhite@radon.eftdomain.net"
+
+cat<<EOH
+################################################################################
+# install a vm named popcorn to cook our kernel
+################################################################################
+EOH
+if [ "$(hostname -s)" != "popcorn" ]; then 
+    if [ -z "$(which vagrant)" ];then echo "vagrant & virtualbox required" ; exit -1 ; fi
+
+    # destroy the last vm with extreme prejudice
+    POPCORN_PID=$(ps -ef | grep 'VBoxHeadless --comment popcorn_' | grep -v grep | awk '{print $2}')
+    [ ! -z "${POPCORN_PID}" ] && kill -9 ${POPCORN_PID}
+    rm -fr ~/.vagrant.d/boxes/popcorn ~/vm/vagrant/popcorn
+
+    SCRIPTDIR=$(cd $(dirname $0); pwd)
+    SCRIPTNAME=$(basename $0)
+    if [ ! -d ~/.vagrant.d/boxes/popcorn ]; then
+        [ ! -d ~/vm/vagrant/popcorn ] && mkdir -p ~/vm/vagrant/popcorn
+        # export http_proxy=http://squid:3128
+        # ( cd ~/vm/vagrant; vagrant box add popcorn http://mathie-vagrant-boxes.s3.amazonaws.com/debian_squeeze_32.box)
+        # ( cd ~/vm/vagrant; vagrant box add popcorn https://stash.eftdomain.net/virtualbox/debian_squeeze_32.box )
+        ( unset http_proxy; cd ~/vm/vagrant; vagrant box add popcorn http://127.0.0.1/vagrantbox/debian_squeeze_32.box )
+        ( cd ~/vm/vagrant/popcorn; vagrant init popcorn )
+    fi 
+    if [ -z "$(ps -ef | grep 'VBoxHeadless --comment popcorn_' | grep -v grep)" ]; then 
+        ( cd ~/vm/vagrant/popcorn; vagrant up )
+    fi
+    ( cd ~/vm/vagrant/popcorn;echo "sudo hostname popcorn"| vagrant ssh -- -A 2>/dev/null )
+    ( cd ~/vm/vagrant/popcorn;echo "echo popcorn|sudo tee /etc/hostname" | vagrant ssh -- -A 2>/dev/null )
+    ( cd ~/vm/vagrant/popcorn;echo "sudo sed -ie 's/vagrant-debian-squeeze/popcorn/g' /etc/hosts" | vagrant ssh -- -A 2>/dev/null )
+    ( cd ~/vm/vagrant/popcorn;echo "sudo mkdir -p /root/.ssh "|vagrant ssh -- -A 2>/dev/null ) 
+    ( cd ~/vm/vagrant/popcorn;echo "sudo chmod 750 /root/.ssh "|vagrant ssh -- -A 2>/dev/null ) 
+    ( cd ~/vm/vagrant/popcorn;echo "echo $(cat ~/.ssh/*.pub) | sudo tee -a /root/.ssh/authorized_keys"|vagrant ssh -- -A 2>/dev/null ) 
+    # Copy this script to the virtualbox and sudo execute it...
+     scp -P 2222                               \
+         -o UserKnownHostsFile=/dev/null       \
+         -o StrictHostKeyChecking=no           \
+         -o LogLevel=ERROR                     \
+         -o IdentitiesOnly=yes                 \
+         -i ${HOME}/.vagrant.d/insecure_private_key \
+        ${SCRIPTDIR}/${SCRIPTNAME} vagrant@127.0.0.1:${SCRIPTNAME}
+    ( cd ~/vm/vagrant/popcorn; echo "ssh-keyscan -t dsa,rsa localhost >> ~/.ssh/known_hosts"|vagrant ssh -- -A 2>/dev/null  ) 
+    ( cd ~/vm/vagrant/popcorn; echo "ssh -A root@localhost /home/vagrant/${SCRIPTNAME}"|vagrant ssh -- -A 2> run.err | tee run.out  ) 
+cat<<EOF
+################################################################################
+#                            Return of Control                                 #
+################################################################################
+EOF
+    export BHASH=$(grep "BUNDLE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+    export MHASH=$(grep "MODULE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+    export DATETIME=$(grep "DATETIME=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+    sed -e "s/~BHASH~/${BHASH}/g" -e "s/~MHASH~/${MHASH}/g" -e "s/~DATETIME~/${DATETIME}/g" -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" \
+        ${SCRIPTDIR}/ro_update.tpl > ${SCRIPTDIR}/ro_update_${DATETIME}
+    curl --insecure -X PUT -T "${SCRIPTDIR}/ro_update_${DATETIME}" "https://stash.eftdomain.net/kernel_bundles/ro_update_${DATETIME}"
+#    ( cd ~/vm/vagrant/popcorn; vagrant halt )
+#    ( cd ~/vm/vagrant/popcorn; yes | vagrant destroy --force )
+    exit 0;
+fi
+
+cat<<EOH
+################################################################################
+################################################################################
+#                                                                              #
+#              the payload below here will run in the virtualbox               #
+#                                                                              #
+################################################################################
+################################################################################
+EOH
+export http_proxy=http://squid.eftdomain.net:3128
+
+cat<<EOH
+################################################################################
+# Install Cfengine
+################################################################################
+EOH
+dpkg -l | grep -q "^ii "| grep "cfengine-community" || \
+  (
+    if [ ! -f "/var/tmp/cfengine-community_3.2.1-1_debian6_i386.deb" ];then 
+        wget -qO /var/tmp/cfengine-community_3.2.1-1_debian6_i386.deb \
+             http://packages.lab.eftdomain.net/working/debian-squeeze-os-i386/cfengine-community_3.2.1-1_debian6_i386.deb
+    fi
+    dpkg -i /var/tmp/cfengine-community_3.2.1-1_debian6_i386.deb
+    wget -qO - cfengine.lab/inputs | bash
+    cf-agent -K
+  )
+
+cat<<EOH
+################################################################################
+# Get dependencies 
+# (sub-shelling to work around apt's exiting omitting subsequent commands)
+################################################################################
+EOH
+( apt-get update )
+( export DEBIAN_FRONTEND=noninteractive; apt-get -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef --yes install debian-keyring )
+( export DEBIAN_FRONTEND=noninteractive; apt-get -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef --yes upgrade )
+( apt-get update )
+(
+  export DEBIAN_FRONTEND=noninteractive;
+  apt-get -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef --yes \
+          install gcc kernel-package libc6-dev tk libncurses5-dev fakeroot git-core   \
+                  build-essential zlib1g-dev cryptsetup
+)
+
+cat<<EOH
+################################################################################
+# AUFS
+################################################################################
+EOH
+# aufs
+ssh-add -l
+echo "-=[ $SSH_PROXY ]=-"
+[ ! -d /var/cache/git ] && mkdir -p /var/cache/git
+(
+  cd /var/cache/git
+  if [ ! -d /var/cache/git/aufs2-standalone ]; then
+      if [ -z "${SSH_PROXY}" ]; then 
+          git clone git://aufs.git.sourceforge.net/gitroot/aufs/aufs2-standalone.git
+      else 
+          HOSTPART=$(echo ${SSH_PROXY} | sed -e 's/.*@//')
+          ssh-keyscan -t dsa,rsa ${HOSTPART} >> /root/.ssh/known_hosts
+          ssh -fNAL9418:aufs.git.sourceforge.net:9418 ${SSH_PROXY} &
+          export SSHPID=$!
+          LISTEN=""
+          TRIES=0;
+          while [ -z "${LISTEN}" -a ${TRIES} -lt 10 ] ;do 
+              sleep 3 
+              LISTEN=$(netstat -an | grep "LISTEN " | grep 9418)
+              TRIES=$(expr ${TRIES} + 1)
+              echo -n "$i: ${LISTEN}"
+          done
+          git clone git://127.0.0.1/gitroot/aufs/aufs2-standalone.git
+          kill -9 ${SSHPID}
+      fi
+  else
+      cd /var/cache/git/aufs2-standalone; git pull
+  fi 
+  cd /var/cache/git/aufs2-standalone
+  # compatibility matrix => http://aufs.sourceforge.net/ 
+  VERSIONS=$(git branch -r | grep 'aufs2.1-' | sed -e 's/.*origin\///')
+  for v in $(echo "${VERSIONS}"); do
+      git checkout ${v} || git checkout -b ${v} origin/${v}
+  done
+)
+
+cat<<EOH
+################################################################################
+# This method downloads the aufs patch and we apply it to our BUILD_ROOT
+################################################################################
+EOH
+# kernel
+export PATCH_EXIT=1
+[ ! -d ${BUILD_ROOT} ] && mkdir -p ${BUILD_ROOT}
+if [ ! -f ${BUILD_ROOT}/linux-${KERNEL}.${KSUBVER}.tar.bz2 ]; then
+    (cd ${BUILD_ROOT}; wget -q http://www.kernel.org/pub/linux/kernel/v2.6/longterm/v${KERNEL}/linux-${KERNEL}.${KSUBVER}.tar.bz2)
+fi 
+
+[ -h ${BUILD_ROOT}/linux ] && unlink ${BUILD_ROOT}/linux
+( cd ${BUILD_ROOT}; tar xjf linux-${KERNEL}.${KSUBVER}.tar.bz2 )
+( cd ${BUILD_ROOT}; ln -s linux-${KERNEL}.${KSUBVER} linux )
+
+( cd /var/cache/git/aufs2-standalone; git checkout ${AUFS_BRANCH} >/dev/null 2>&1 )
+# patch kernel with aufs
+(
+  cd ${BUILD_ROOT}/linux
+  patch -p1 <  /var/cache/git/aufs2-standalone/aufs2-kbuild.patch     >/dev/null 2>&1      && \
+  patch -p1 <  /var/cache/git/aufs2-standalone/aufs2-base.patch       >/dev/null 2>&1      && \
+  patch -p1 <  /var/cache/git/aufs2-standalone/proc_map.patch         >/dev/null 2>&1      && \
+  patch -p1 <  /var/cache/git/aufs2-standalone/aufs2-standalone.patch >/dev/null 2>&1      && \
+  for x in Documentation fs ; do rsync -azP /var/cache/git/aufs2-standalone/${x}/ ${BUILD_ROOT}/linux/${x}/ > /dev/null ;done && \
+  install -m 0755 /var/cache/git/aufs2-standalone/include/linux/aufs_type.h ${BUILD_ROOT}/linux/include/linux/aufs_type.h
+)
+PATCH_EXIT=$?
+if [ $PATCH_EXIT -ne 0 ]; then 
+    echo "Failure: ${KERNEL}.${KSUBVER} && ${branch} : ${PATCH_EXIT}"
+    [ -d ${BUILD_ROOT}/linux-${KERNEL}.${KSUBVER} ] && rm -fr ${BUILD_ROOT}/linux-${KERNEL}.${KSUBVER}
+    [ -h ${BUILD_ROOT}/linux ] && unlink /opt/local/src/linux
+    exit 1
+else
+    echo "Success: ${KERNEL}.${KSUBVER} && ${branch} : ${PATCH_EXIT}"
+fi
+
+cat<<EOH
+################################################################################
+# Set up the source .config from a gist
+################################################################################
+EOH
+OLDCONFIG_EXIT=0; # if we don't run it, assume it exited 0
+if [ ! -f /var/tmp/config-${KERNEL}.${KSUBVER} ]; then
+    export GISTROOT=$(mktemp -d /tmp/GIST.XXXX)
+    if [ -z "${SSH_PROXY}" ]; then 
+        ( cd ${GISTROOT} ; git clone git://gist.github.com/${CONFIG_GIST}.git )
+    else 
+        ssh -fNAL9418:gist.github.com:9418 ${SSH_PROXY} &
+        SSHPID=$!
+        git clone git://127.0.0.1/${CONFIG_GIST}.git 
+        kill -9 ${SSHPID}
+    fi
+    if [ -f ${GISTROOT}/${CONFIG_GIST}/config-${KERNEL}.${KSUBVER} ]; then
+        echo "Using config-${KERNEL}.${KSUBVER} from gist-${CONFIG_GIST}/config-${KERNEL}.${KSUBVER}"
+        cp ${GISTROOT}/${CONFIG_GIST}/config-${KERNEL}.${KSUBVER} ${BUILD_ROOT}/linux/.config
+    else
+        echo "no specific config found. Using default config"
+        cp ${GISTROOT}/${CONFIG_GIST}/config ${BUILD_ROOT}/linux/.config
+        (cd $BUILD_ROOT/linux; make oldconfig)
+        OLDCONFIG_EXIT=$?
+        # copy the new one with an append version line to /var/tmp
+        echo "# APPEND_VERSION='-net5501'"  > /var/tmp/config-${KERNEL}.${KSUBVER}
+        echo "#"                           >> /var/tmp/config-${KERNEL}.${KSUBVER}
+        cat ${BUILD_ROOT}/.config          >> /var/tmp/config-${KERNEL}.${KSUBVER}
+        if [ ! -z "${GISTROOT}" ]; then rm -fr "${GISTROOT}"; fi
+    fi
+else
+    echo "Using /var/tmp/config-${KERNEL}.${KSUBVER}"
+    cp /var/tmp/config-${KERNEL}.${KSUBVER} cp ${BUILD_ROOT}/linux/.config
+fi
+if [ ${OLDCONFIG_EXIT} -ne 0 ];then 
+    echo "something went wrong with 'make oldconfig' Aborting..."
+    exit 1
+fi
+if [ ${OLDCONFIG_EXIT} -ne 0 ];then 
+    grep "CONFIG_AUFS_FS" ${BUILD_ROOT}/linux/.config || \
+    (
+      cp ${BUILD_ROOT}/linux/.config ${BUILD_ROOT}/linux/.config.preawk
+      awk '{
+            if($0~"CONFIG_EXOFS_DEBUG"){
+              print $0;
+              print "CONFIG_AUFS_FS=m";
+              print "CONFIG_AUFS_BRANCH_MAX_127=y";
+              print "# CONFIG_AUFS_BRANCH_MAX_511 is not set";
+              print "# CONFIG_AUFS_BRANCH_MAX_1023 is not set";
+              print "# CONFIG_AUFS_BRANCH_MAX_32767 is not set";
+              print "# CONFIG_AUFS_HINOTIFY is not set";
+              print "# CONFIG_AUFS_EXPORT is not set";
+              print "# CONFIG_AUFS_RDU is not set";
+              print "# CONFIG_AUFS_SP_IATTR is not set";
+              print "# CONFIG_AUFS_SHWH is not set";
+              print "# CONFIG_AUFS_BR_RAMFS is not set";
+              print "# CONFIG_AUFS_BR_FUSE is not set";
+              print "CONFIG_AUFS_BDEV_LOOP=y";
+              print "# CONFIG_AUFS_DEBUG is not set ";
+            }else{
+              print $0;
+            }
+           }' ${BUILD_ROOT}/linux/.config.preawk > ${BUILD_ROOT}/linux/.config
+          
+    ) 
+fi
+
+cat<<EOH
+################################################################################
+# BUILDING THE PACKAGE (optional, non-aufs, to ensure everything up to here works)
+################################################################################
+EOH
+APPEND_VERSION=$(
+                  grep "CONFIG_LOCALVERSION=" ${BUILD_ROOT}/linux/.config |\
+                  sed -e 's/CONFIG_LOCALVERSION="//' -e 's/"//g'
+                )
+
+#APPEND_VERSION=$(
+#                  grep "# *APPEND_VERSION *= *" ${BUILD_ROOT}/linux/.config |\
+#                  sed -e 's/#.*APPEND_VERSION *=//' -e "s/'//g"
+#                )
+#export APPEND_VERSION
+#if [ -z "${APPEND_VERSION}" ]; then
+#    echo "Could not determind APPEND_VERSION aborting compile..."
+#    exit 1;
+#fi
+
+( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg clean )
+#(cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version "${APPEND_VERSION}" --revision 1 kernel_image )
+(cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version "-net-5501" --revision 2 kernel_image kernel_source kernel_headers kernel_doc )
+
+cat<<EOH
+################################################################################
+# prepping initramfs-tools
+################################################################################
+EOH
+apt-get install -y initramfs-tools
+if [ ! -d /etc/initramfs-tools/.git ]; then 
+    ( cd /etc/initramfs-tools; git init; find * -type f -exec git add {} \;; git commit -a -m "addding initial files"; )
+fi
+( cd /etc/initramfs-tools; git branch | grep soekris  || git branch soekris )
+( cd /etc/initramfs-tools; git branch | grep '* soekris' || git checkout soekris )
+
+GITTMP=$(mktemp -d /var/tmp/git.XXXX)
+cd ${GITTMP}
+if [ -z "${SSH_PROXY}" ]; then
+    git clone git://github.com/fapestniegd/initramfs-scripts.git
+else
+    HOSTPART=$(echo ${SSH_PROXY} | sed -e 's/.*@//')
+    ssh-keyscan -t dsa,rsa ${HOSTPART} >> /root/.ssh/known_hosts
+    ssh -fNAL9418:github.com:9418 ${SSH_PROXY} &
+    export SSHPID=$!
+    LISTEN=""
+    TRIES=0;
+    while [ -z "${LISTEN}" -a ${TRIES} -lt 10 ] ;do
+        sleep 3
+        LISTEN=$(netstat -an | grep "LISTEN " | grep 9418)
+        TRIES=$(expr ${TRIES} + 1)
+        echo -n "$i: ${LISTEN}"
+    done
+    git clone git://127.0.0.1/fapestniegd/initramfs-scripts.git
+    kill -9 ${SSHPID}
+fi
+cd 
+rsync -avzPC --delete --exclude .git ${GITTMP}/initramfs-scripts/ /etc/initramfs-tools/
+(cd /etc/initramfs-tools; find * -type f -exec git add {} \;)
+(cd /etc/initramfs-tools; git commit -a -m "cloned from github" )
+[ -d "${GITTMP}" ] && rm -fr "${GITTMP}"
+
+# Don't do this.
+# mkinitramfs -o /var/tmp/initrd.img-$(uname -r) $(uname -r)
+
+# revert to the system initrd so we don't brick our virtualbox, and install our new kernels
+( cd /etc/initramfs-tools; git branch | grep '* master' || git checkout master )
+dpkg -i ${BUILD_ROOT}/linux-image-${KERNEL}.${KSUBVER}*.deb
+
+cat<<EOH
+################################################################################
+# create and inspect the initrd
+################################################################################
+EOH
+( cd /etc/initramfs-tools; git branch | grep '* soekris' || git checkout soekris )
+mkinitramfs -o /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}
+
+IRDTMP=$(mktemp -d /tmp/initrd.d.XXXX)
+( cd ${IRDTMP}; cat /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} | gzip -dc | cpio -idm )
+( 
+  cd ${IRDTMP}; 
+  find * -name cryptsetup    | grep 'sbin/cryptsetup'                 && \
+  find * -name root_on_crypt | grep 'scripts/local-top/root_on_crypt' && \
+  find * -name aufs          | grep 'aufs'                            && \
+  find * -name ro_root       | grep 'scripts/init-bottom/ro_root'
+) 
+EXIT=$?
+echo "initrd exited with ${EXIT}"
+[ -d "${IRDTMP}" ] && rm -fr "${IRDTMP}"
+( cd /etc/initramfs-tools; git branch | grep '* master' || git checkout master )
+
+cat<<EOH
+################################################################################
+# bundle up the kernel, config, system-map, initrd, and modules
+################################################################################
+EOH
+export BUNDLE=$(mktemp -d /var/tmp/kernel_bundle.XXXX);
+(cd /lib/modules; tar cvzf ${BUNDLE}/modules-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}) 
+MHASH=$(sha1sum ${BUNDLE}/modules-${KERNEL}.${KSUBVER}${APPEND_VERSION}|awk '{print $1}')
+cp /boot/*-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${BUNDLE}/
+cp /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${BUNDLE}/
+
+(cd ${BUNDLE}; tar cvzf kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz *)
+BHASH=$(sha1sum ${BUNDLE}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz | awk '{print $1}')
+export DATETIME=$(date +'%Y%m%d%H%M')
+cat<<EOF
+################################################################################
+#                                 Shipping...                                  #
+################################################################################
+EOF
+curl --insecure -X PUT -T ${BUNDLE}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz \
+    https://stash.eftdomain.net/kernel_bundles/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}-${DATETIME}.tgz
+
+echo
+echo "DATETIME='${DATETIME}'"
+echo "BUNDLE_HASH='${BHASH}'"
+echo "MODULE_HASH='${MHASH}'"
+echo
+cat<<EOF
+################################################################################
+#                                End Payload                                   #
+################################################################################
+EOF
+exit 0;

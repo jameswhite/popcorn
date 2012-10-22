@@ -1,0 +1,283 @@
+#!/bin/bash
+################################################################################
+# 
+################################################################################
+#export KERNEL=2.6.32
+#export KSUBVER=59
+#export AUFS_BRANCH=aufs2.1-32
+
+#export KERNEL=2.6.34
+#export KSUBVER=12
+#export AUFS_BRANCH=aufs2.1-34
+
+export KERNEL=2.6.35
+export KSUBVER=12
+export AUFS_BRANCH=aufs2.1-35
+
+export CONFIG_GIST="446120"
+export BUILD_ROOT="/opt/local/src/"
+
+################################################################################
+# install a vm named popcorn to cook our kernel
+################################################################################
+# kill -9 $(ps -ef | grep 'VBoxHeadless --comment popcorn_' | grep -v grep | awk '{print $2}')
+# rm -fr ~/.vagrant.d/boxes/popcorn ~/vm/vagrant/popcorn
+if [ "$(hostname -s)" != "popcorn" ]; then 
+    if [ -z "$(which vagrant)" ];then echo "vagrant & virtualbox required" ; exit -1 ; fi
+    SCRIPTDIR=$(cd $(dirname $0); pwd)
+    SCRIPTNAME=$(basename $0)
+    if [ ! -d ~/.vagrant.d/boxes/popcorn ]; then
+        [ ! -d ~/vm/vagrant/popcorn ] && mkdir -p ~/vm/vagrant/popcorn
+        # export http_proxy=http://squid:3128
+        # ( cd ~/vm/vagrant; vagrant box add popcorn http://mathie-vagrant-boxes.s3.amazonaws.com/debian_squeeze_32.box)
+        # ( cd ~/vm/vagrant; vagrant box add popcorn https://stash.eftdomain.net/virtualbox/debian_squeeze_32.box )
+        ( unset http_proxy; cd ~/vm/vagrant; vagrant box add popcorn http://127.0.0.1/vagrantbox/debian_squeeze_32.box )
+        ( cd ~/vm/vagrant/popcorn; vagrant init popcorn )
+    fi 
+    if [ -z "$(ps -ef | grep 'VBoxHeadless --comment popcorn_' | grep -v grep)" ]; then 
+        ( cd ~/vm/vagrant/popcorn; vagrant up )
+    fi
+    ( cd ~/vm/vagrant/popcorn; echo "sudo hostname popcorn"| vagrant ssh 2>/dev/null )
+    ( cd ~/vm/vagrant/popcorn; echo "echo popcorn|sudo tee /etc/hostname" | vagrant ssh 2>/dev/null )
+    ( cd ~/vm/vagrant/popcorn; echo "sudo sed -ie 's/vagrant-debian-squeeze/popcorn/g' /etc/hosts" | vagrant ssh 2>/dev/null )
+    # Copy this script to the virtualbox and sudo execute it...
+     scp -P 2222                               \
+         -o UserKnownHostsFile=/dev/null       \
+         -o StrictHostKeyChecking=no           \
+         -o LogLevel=ERROR                     \
+         -o IdentitiesOnly=yes                 \
+         -i ${HOME}/.vagrant.d/insecure_private_key \
+        ${SCRIPTDIR}/${SCRIPTNAME} vagrant@127.0.0.1:${SCRIPTNAME}
+    ( cd ~/vm/vagrant/popcorn; echo "/usr/bin/sudo /home/vagrant/${SCRIPTNAME}" | vagrant ssh )
+    exit 0;
+fi
+
+################################################################################
+################################################################################
+# the payload below here will run in the virtualbox
+#
+################################################################################
+################################################################################
+export http_proxy=http://squid:3128
+
+################################################################################
+# Install Cfengine
+################################################################################
+dpkg -l | grep -q "^ii "| grep "cfengine-community" || \
+  (
+    if [ ! -f "/var/tmp/cfengine-community_3.2.1-1_debian6_i386.deb" ];then 
+        wget -qO /var/tmp/cfengine-community_3.2.1-1_debian6_i386.deb \
+             http://packages.lab.eftdomain.net/working/debian-squeeze-os-i386/cfengine-community_3.2.1-1_debian6_i386.deb
+    fi
+    dpkg -i /var/tmp/cfengine-community_3.2.1-1_debian6_i386.deb
+    wget -qO - cfengine.lab/inputs | bash
+    cf-agent -K
+  )
+
+################################################################################
+# Get dependencies 
+# (sub-shelling to work around apt's exiting omitting subsequent commands)
+################################################################################
+apt-get update
+(apt-get install --yes debian-keyring)
+(apt-get install -o Dpkg::Options::=--force-confdef --yes grub)
+(apt-get  -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef --yes upgrade)
+(
+  apt-get install -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef --yes \
+                     gcc kernel-package linux-source-${KERNEL} libc6-dev  \
+                     tk libncurses5-dev fakeroot git-core build-essential \
+                     zlib1g-dev cryptsetup
+)
+
+# ################################################################################
+# # Get the kernel from deb src
+# ################################################################################
+# 
+# if [ ! -f /usr/src/linux-source-${KERNEL}.tar.bz2 ]; then
+#     apt-get install -y --reinstall linux-source-${KERNEL}
+# fi
+# if [ ! -d ${BUILD_ROOT} ]; then
+#     mkdir -p "${BUILD_ROOT}"
+# fi
+# if [ ! -d ${BUILD_ROOT}/linux-source-${KERNEL} ]; then
+#     (cd ${BUILD_ROOT}; tar xvjf /usr/src/linux-source-${KERNEL}.tar.bz2)
+# fi
+# if [ ! -h ${BUILD_ROOT}/linux ]; then
+#     (cd ${BUILD_ROOT}; ln -s linux-source-${KERNEL} linux)
+# fi
+# 
+# ################################################################################
+# # Set up the source .config from a gist
+# ################################################################################
+# export GISTROOT=$(mktemp -d /tmp/GIST.XXXX)
+# ( cd ${GISTROOT} ; git clone git://gist.github.com/${CONFIG_GIST}.git )
+# cp ${GISTROOT}/${CONFIG_GIST}/config ${BUILD_ROOT}/.config
+# (cd $BUILD_ROOT/linux; make oldconfig)
+# if [ ! -z "${GISTROOT}" ]; then rm -fr "${GISTROOT}"; fi
+# 
+# ################################################################################
+# # BUILDING THE PACKAGE (optional, non-aufs, to ensure everything up to here works)
+# ################################################################################
+# APPEND_VERSION=$(
+#                   grep "# *APPEND_VERSION *= *" ${BUILD_ROOT}/.config |\
+#                   sed -e 's/#.*APPEND_VERSION *=//' -e "s/'//g"
+#                 )
+# export APPEND_VERSION
+# ( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg clean )
+# (cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version ${APPEND_VERSION} --revision 1 kernel_image )
+# 
+# ################################################################################
+# # Build the Kernel
+# ################################################################################
+
+################################################################################
+# This method downloads the entire kernel source with aufs pre-patched in
+################################################################################
+# (
+#   cd /var/cache/git
+#   git clone git://git.c3sl.ufpr.br/aufs/aufs2-2.6.git
+#   cd /var/cache/git/aufs2-2.6
+#   git checkout -b aufs2.1-39 origin/aufs2.1-39
+# )
+# git clone git://git.c3sl.ufpr.br/aufs/aufs2-util.git
+
+################################################################################
+# AUFS
+################################################################################
+# aufs
+(
+  cd /var/cache/git
+  if [ ! -d /var/cache/git/aufs2-standalone ]; then
+      git clone git://aufs.git.sourceforge.net/gitroot/aufs/aufs2-standalone.git
+  else
+      cd /var/cache/git/aufs2-standalone; git pull
+  fi 
+  cd /var/cache/git/aufs2-standalone
+  # compatibility matrix => http://aufs.sourceforge.net/ 
+  VERSIONS=$(git branch -r | grep 'aufs2.1-' | sed -e 's/.*origin\///')
+  for v in $(echo "${VERSIONS}"); do
+      git checkout ${v} || git checkout -b ${v} origin/${v}
+  done
+)
+
+################################################################################
+# This method downloads the aufs patch and we apply it to our BUILD_ROOT
+################################################################################
+# kernel
+export PATCH_EXIT=1
+if [ ! -f /opt/local/src/linux-${KERNEL}.${KSUBVER}.tar.bz2 ]; then
+    (cd /opt/local/src ; wget -q http://www.kernel.org/pub/linux/kernel/v2.6/longterm/v${KERNEL}/linux-${KERNEL}.${KSUBVER}.tar.bz2)
+fi 
+[ -h /opt/local/src/linux ] && unlink /opt/local/src/linux
+( cd /opt/local/src; tar xjf linux-${KERNEL}.${KSUBVER}.tar.bz2 )
+( cd /opt/local/src; ln -s linux-${KERNEL}.${KSUBVER} linux )
+
+( cd /var/cache/git/aufs2-standalone; git checkout ${AUFS_BRANCH} >/dev/null 2>&1 )
+# patch kernel with aufs
+(
+  cd ${BUILD_ROOT}/linux
+  patch -p1 <  /var/cache/git/aufs2-standalone/aufs2-base.patch       >/dev/null 2>&1      && \
+  patch -p1 <  /var/cache/git/aufs2-standalone/proc_map.patch         >/dev/null 2>&1      && \
+  patch -p1 <  /var/cache/git/aufs2-standalone/aufs2-standalone.patch >/dev/null 2>&1      && \
+  for x in Documentation fs ; do rsync -azP /var/cache/git/aufs2-standalone/${x}/ ${BUILD_ROOT}/linux/${x}/ > /dev/null ;done && \
+  install -m 0755 /var/cache/git/aufs2-standalone/include/linux/aufs_type.h ${BUILD_ROOT}/linux/include/linux/aufs_type.h
+)
+PATCH_EXIT=$?
+if [ $PATCH_EXIT -ne 0 ]; then 
+    echo "Failure: ${KERNEL}.${KSUBVER} && ${branch} : ${PATCH_EXIT}"
+    [ -d /opt/local/src/linux-${KERNEL}.${KSUBVER} ] && rm -fr /opt/local/src/linux-${KERNEL}.${KSUBVER}
+    [ -h /opt/local/src/linux ] && unlink /opt/local/src/linux
+else
+    echo "Success: ${KERNEL}.${KSUBVER} && ${branch} : ${PATCH_EXIT}"
+fi
+
+################################################################################
+# Set up the source .config from a gist
+################################################################################
+if [ -f /var/tmp/config-${KERNEL}.${KSUBVER} ]; then
+    export GISTROOT=$(mktemp -d /tmp/GIST.XXXX)
+    ( cd ${GISTROOT} ; git clone git://gist.github.com/${CONFIG_GIST}.git )
+    cp ${GISTROOT}/${CONFIG_GIST}/config ${BUILD_ROOT}/.config
+    (cd $BUILD_ROOT/linux; make oldconfig)
+    cp ${BUILD_ROOT}/.config /var/tmp/config-${KERNEL}.${KSUBVER}
+    if [ ! -z "${GISTROOT}" ]; then rm -fr "${GISTROOT}"; fi
+else
+    cp /var/tmp/config-${KERNEL}.${KSUBVER} cp ${BUILD_ROOT}/.config
+    (cd $BUILD_ROOT/linux; make oldconfig)
+    # copy the resulting one back, but they should be identical
+    cp ${BUILD_ROOT}/.config /var/tmp/config-${KERNEL}.${KSUBVER}
+fi
+
+################################################################################
+# BUILDING THE PACKAGE (optional, non-aufs, to ensure everything up to here works)
+################################################################################
+APPEND_VERSION=$(
+                  grep "# *APPEND_VERSION *= *" ${BUILD_ROOT}/.config |\
+                  sed -e 's/#.*APPEND_VERSION *=//' -e "s/'//g"
+                )
+export APPEND_VERSION
+( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg clean )
+(cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version ${APPEND_VERSION} --revision 1 kernel_image )
+
+################################################################################
+# prepping initramfs-tools
+################################################################################
+apt-get install -y initramfs-tools
+if [ ! -d /etc/initramfs-tools/.git ]; then 
+    ( cd /etc/initramfs-tools; git init; find * -type f -exec git add {} \;; git commit -a -m "addding initial files"; )
+fi
+( cd /etc/initramfs-tools; git branch | grep soekris  || git branch soekris )
+( cd /etc/initramfs-tools; git branch | grep '* soekris' || git checkout soekris )
+
+GITTMP=$(mktemp -d /var/tmp/git.XXXX)
+( cd ${GITTMP}; git clone git://github.com/fapestniegd/initramfs-scripts.git )
+rsync -avzPC --delete --exclude .git ${GITTMP}/initramfs-scripts/ /etc/initramfs-tools/
+(cd /etc/initramfs-tools; find * -type f -exec git add {} \;)
+(cd /etc/initramfs-tools; git commit -a -m "cloned from github" )
+[ -d "${GITTMP}" ] && rm -fr "${GITTMP}"
+
+# Don't do this.
+# mkinitramfs -o /var/tmp/initrd.img-$(uname -r) $(uname -r)
+
+# revert to the system initrd so we don't brick our virtualbox, and install our new kernels
+( cd /etc/initramfs-tools; git branch | grep '* master' || git checkout master )
+dpkg -i /opt/local/src/linux-image-${KERNEL}.${KSUBVER}${APPEND_VERSION}_*.deb
+
+
+################################################################################
+# create and inspect the initrd
+################################################################################
+( cd /etc/initramfs-tools; git branch | grep '* soekris' || git checkout soekris )
+mkinitramfs -o /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}
+
+IRDTMP=$(mktemp -d /tmp/initrd.d.XXXX)
+( cd ${IRDTMP}; cat /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} | gzip -dc | cpio -idm )
+( 
+  cd ${IRDTMP}; 
+  find * -name cryptsetup    | grep 'sbin/cryptsetup'                 && \
+  find * -name root_on_crypt | grep 'scripts/local-top/root_on_crypt' && \
+  find * -name aufs          | grep 'aufs'                            && \
+  find * -name ro_root       | grep 'scripts/init-bottom/ro_root'
+) 
+EXIT=$?
+echo "initrd exited with ${EXIT}"
+[ -d "${IRDTMP}" ] && rm -fr "${IRDTMP}"
+
+################################################################################
+# bundle up the kernel, config, system-map, initrd, and modules
+################################################################################
+export BUNDLE=$(mktemp -d /var/tmp/kernel_bundle.XXXX);
+(cd /lib/modules; tar cvzf ${BUNDLE}/modules-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}) 
+MHASH=$(sha1sum ${BUNDLE}/modules-${KERNEL}.${KSUBVER}${APPEND_VERSION}|awk '{print $1}')
+cp /boot/*-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${BUNDLE}/
+cp /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${BUNDLE}/
+
+(cd ${BUNDLE}; tar cvzf kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz *)
+BHASH=$(sha1sum ${BUNDLE}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz | awk '{print $1}')
+curl --insecure -X PUT -T ${BUNDLE}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz \
+    https://stash.eftdomain.net/kernel_bundles/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz
+
+echo
+echo "BUNDLE_HASH='${BHASH}'"
+echo "MODULE_HASH='${MHASH}'"
+echo
