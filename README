@@ -4,3 +4,21 @@ custom kernels for aufs-read-write-over-root-on-cryptoloop and other insane layo
 
 It uses a vagrant vm to do the actual build, then pushes the packages, as well as the initrd, vmlinux, lib/modules/tarball, and config to a stash  (mod_dav) server.
 It also references other repositories on github to get patches to the kernel (aufs is unstable on the default linux kernel)
+
+Usage: curl -k https://raw.github.com/fapestniegd/popcorn/master/bin/popcorn | /bin/bash
+
+Or just download the same, chmod +x it and run it.
+
+What does it do?
+
+It will source a file in your home directory called .popcornrc (if exists) or use some defaults.
+
+
+
+# .popcornrc example:
+
+export KERNEL=2.6.35
+export KSUBVER=13
+export AUFS_BRANCH=aufs2.1-35
+export GITHUB_READONLY_TOKEN="1485723c684fdf8b788fe221904891b8851ee1a5"
+
