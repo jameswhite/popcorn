@@ -92,9 +92,6 @@ if [ "$(hostname -s)" != "popcorn" ]; then
     fi
     ( cd ~/vm/vagrant/popcorn; echo "ssh-keyscan -t dsa,rsa localhost >> ~/.ssh/known_hosts"|vagrant ssh -- -A 2>/dev/null  ) 
     ( cd ~/vm/vagrant/popcorn; echo "ssh -A root@localhost /home/vagrant/${SCRIPTNAME}"|vagrant ssh -- -A 2> run.err | tee run.out  ) 
-
-echo "I RAN"
-exit 0;
 cat<<EOF
 ################################################################################
 #                            Return of Control                                 #
@@ -111,6 +108,7 @@ EOF
     exit 0;
 fi
 
+echo "I RAN"
 cat<<EOH
 ################################################################################
 ################################################################################
