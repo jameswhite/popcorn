@@ -79,6 +79,7 @@ if [ "$(hostname -s)" != "popcorn" ]; then
          -i ${HOME}/.vagrant.d/insecure_private_key \
         ${SCRIPTDIR}/${SCRIPTNAME} vagrant@127.0.0.1:${SCRIPTNAME}
     ( cd ~/vm/vagrant/popcorn; echo "ssh-keyscan -t dsa,rsa localhost >> ~/.ssh/known_hosts"|vagrant ssh -- -A 2>/dev/null  ) 
+exit 0;
     ( cd ~/vm/vagrant/popcorn; echo "ssh -A root@localhost /home/vagrant/${SCRIPTNAME}"|vagrant ssh -- -A 2> run.err | tee run.out  ) 
 
 cat<<EOF
