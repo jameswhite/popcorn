@@ -93,6 +93,7 @@ if [ "$(hostname -s)" != "popcorn" ]; then
     ( cd ~/vm/vagrant/popcorn; echo "ssh-keyscan -t dsa,rsa localhost >> ~/.ssh/known_hosts"|vagrant ssh -- -A 2>/dev/null  ) 
     echo "Running ${SCRIPTNAME}"
     ( cd ~/vm/vagrant/popcorn; echo "ssh -A root@localhost /home/vagrant/${SCRIPTNAME}"|vagrant ssh -- -A 2> run.err | tee run.out  ) 
+    echo "Finished running ${SCRIPTNAME}"
 cat<<EOF
 ################################################################################
 #                            Return of Control                                 #
