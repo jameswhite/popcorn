@@ -293,31 +293,18 @@ if [ ${OLDCONFIG_EXIT} -ne 0 ];then
     ) 
 fi
 
-exit 0;
 
 cat<<EOH
 ################################################################################
 # BUILDING THE PACKAGE (optional, non-aufs, to ensure everything up to here works)
 ################################################################################
 EOH
-APPEND_VERSION=$(
-                  grep "CONFIG_LOCALVERSION=" ${BUILD_ROOT}/linux/.config |\
-                  sed -e 's/CONFIG_LOCALVERSION="//' -e 's/"//g'
-                )
-
-#APPEND_VERSION=$(
-#                  grep "# *APPEND_VERSION *= *" ${BUILD_ROOT}/linux/.config |\
-#                  sed -e 's/#.*APPEND_VERSION *=//' -e "s/'//g"
-#                )
-#export APPEND_VERSION
-#if [ -z "${APPEND_VERSION}" ]; then
-#    echo "Could not determind APPEND_VERSION aborting compile..."
-#    exit 1;
-#fi
-
 ( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg clean )
-#(cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version "${APPEND_VERSION}" --revision 1 kernel_image )
 (cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version "-net-5501" --revision 2 kernel_image kernel_source kernel_headers kernel_doc )
+
+#------------------------------------------------------------------------------#
+exit 0;
+#------------------------------------------------------------------------------#
 
 cat<<EOH
 ################################################################################
