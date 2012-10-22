@@ -19,6 +19,7 @@ cat<<EOF > ~/.popcornrc
     export BUILD_ROOT="/opt/local/src/"
     export http_proxy=http://squid:3128
     export SQUEEZE_BOX="http://mathie-vagrant-boxes.s3.amazonaws.com/debian_squeeze_32.box"
+    export DEBIAN_MIRROR="ftp.us.debian.org"
 EOF
     chmod 755 ~/.popcornrc
     . ~/.popcornrc
@@ -54,12 +55,12 @@ if [ "$(hostname -s)" != "popcorn" ]; then
         #( cd ~/vm/vagrant/popcorn; vagrant destroy -f )
         echo "popcorn vm already exists"
     fi
-    ( cd ~/vm/vagrant/popcorn;echo "sudo hostname popcorn"| vagrant ssh -- -A 2>/dev/null )
-    ( cd ~/vm/vagrant/popcorn;echo "echo popcorn|sudo tee /etc/hostname" | vagrant ssh -- -A 2>/dev/null )
-    ( cd ~/vm/vagrant/popcorn;echo "sudo sed -ie 's/vagrant-debian-squeeze/popcorn/g' /etc/hosts" | vagrant ssh -- -A 2>/dev/null )
+    ( cd ~/vm/vagrant/popcorn;echo "sudo hostname popcorn"| vagrant ssh -- -A >/dev/null 2>&1 )
+    ( cd ~/vm/vagrant/popcorn;echo "echo popcorn|sudo tee /etc/hostname" | vagrant ssh -- -A >/dev/null 2>&1)
+    ( cd ~/vm/vagrant/popcorn;echo "sudo sed -ie 's/vagrant-debian-squeeze/popcorn/g' /etc/hosts" | vagrant ssh -- -A >/dev/null 2>&1)
     ( cd ~/vm/vagrant/popcorn;echo "sudo mkdir -p /root/.ssh "|vagrant ssh -- -A 2>/dev/null ) 
     ( cd ~/vm/vagrant/popcorn;echo "sudo chmod 750 /root/.ssh "|vagrant ssh -- -A 2>/dev/null ) 
-    ( cd ~/vm/vagrant/popcorn;echo "echo $(cat ~/.ssh/*.pub) | sudo tee -a /root/.ssh/authorized_keys"|vagrant ssh -- -A 2>/dev/null ) 
+    ( cd ~/vm/vagrant/popcorn;echo "echo $(cat ~/.ssh/*.pub) | sudo tee -a /root/.ssh/authorized_keys"|vagrant ssh -- -A >/dev/null 2>&1 ) 
     if [ -f ~/.popcornrc ]; then 
         # Copy this script to the virtualbox and sudo execute it...
          scp -P 2222                               \
@@ -69,7 +70,7 @@ if [ "$(hostname -s)" != "popcorn" ]; then
              -o IdentitiesOnly=yes                 \
              -i ${HOME}/.ssh/id_dsa.pub            \
              -i ${HOME}/.ssh/id_rsa.pub            \
-             ~/.popcornrc root@127.0.0.1:/root/.popcornrc
+             ~/.popcornrc root@127.0.0.1:/root/.popcornrc > /dev/null 2>&1
     fi
     # Copy this script to the virtualbox and sudo execute it...
     DELETE='false'
@@ -85,13 +86,13 @@ if [ "$(hostname -s)" != "popcorn" ]; then
         -o LogLevel=ERROR                          \
         -o IdentitiesOnly=yes                      \
         -i ${HOME}/.vagrant.d/insecure_private_key \
-       ${SCRIPTDIR}/${SCRIPTNAME} vagrant@127.0.0.1:${SCRIPTNAME}
+       ${SCRIPTDIR}/${SCRIPTNAME} vagrant@127.0.0.1:${SCRIPTNAME} > /dev/null 2>&1
     if [ "${DELETE}" == "true" ]; then
         /bin/rm ${SCRIPTDIR}/${SCRIPTNAME}
         /bin/rmdir ${SCRIPTDIR}
     fi
-    ( cd ~/vm/vagrant/popcorn; echo "ssh-keyscan -t dsa,rsa localhost >> ~/.ssh/known_hosts"|vagrant ssh -- -A 2>/dev/null  ) 
-    ( cd ~/vm/vagrant/popcorn; echo "chmod 755 ${SCRIPTNAME}"|vagrant ssh -- -A 2>/dev/null  ) 
+    ( cd ~/vm/vagrant/popcorn; echo "ssh-keyscan -t dsa,rsa localhost >> ~/.ssh/known_hosts"|vagrant ssh -- -A >/dev/null 2>&1 ) 
+    ( cd ~/vm/vagrant/popcorn; echo "chmod 755 ${SCRIPTNAME}"|vagrant ssh -- -A >/dev/null 2>&1 ) 
     ( cd ~/vm/vagrant/popcorn; echo "ssh -A root@localhost /home/vagrant/${SCRIPTNAME}"|vagrant ssh -- -A 2> run.err | tee run.out  ) 
 cat<<EOF
 ################################################################################
@@ -132,6 +133,14 @@ cat<<EOH
 # (sub-shelling to work around apt's exiting omitting subsequent commands)
 ################################################################################
 EOH
+cat<<EOSL > /etc/apt/sources.list
+deb http://${DEBIAN_MIRROR}/debian/ squeeze main 
+deb-src http://${DEBIAN_MIRROR}/debian/ squeeze main          
+deb http://security.debian.org/ squeeze/updates main                                                                 
+deb-src http://security.debian.org/ squeeze/updates main                                                             
+deb http://${DEBIAN_MIRROR}/debian/ squeeze-updates main                                                        
+deb-src http://${DEBIAN_MIRROR}/debian/ squeeze-updates main   
+EOSL
 ( apt-get update )
 ( export DEBIAN_FRONTEND=noninteractive; apt-get -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef --yes install debian-keyring )
 ( export DEBIAN_FRONTEND=noninteractive; apt-get -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef --yes upgrade )
@@ -153,7 +162,8 @@ EOH
 (
   cd /var/cache/git
   if [ ! -d /var/cache/git/aufs2-standalone ]; then
-          git clone https://${GITHUB_AUTH_TOKEN}github.com/fapestniegd/aufs2-standalone.git
+      echo "git clone https://${GITHUB_AUTH_TOKEN}github.com/fapestniegd/aufs2-standalone.git"
+      git clone https://${GITHUB_AUTH_TOKEN}github.com/fapestniegd/aufs2-standalone.git
   else
       cd /var/cache/git/aufs2-standalone; git pull
   fi 
