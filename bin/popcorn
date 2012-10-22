@@ -92,21 +92,20 @@ if [ "$(hostname -s)" != "popcorn" ]; then
     fi
     ( cd ~/vm/vagrant/popcorn; echo "ssh-keyscan -t dsa,rsa localhost >> ~/.ssh/known_hosts"|vagrant ssh -- -A 2>/dev/null  ) 
     ( cd ~/vm/vagrant/popcorn; echo "chmod 755 ${SCRIPTNAME}"|vagrant ssh -- -A 2>/dev/null  ) 
-    echo "Running ${SCRIPTNAME}"
     ( cd ~/vm/vagrant/popcorn; echo "ssh -A root@localhost /home/vagrant/${SCRIPTNAME}"|vagrant ssh -- -A 2> run.err | tee run.out  ) 
-    echo "Finished running ${SCRIPTNAME}"
 cat<<EOF
 ################################################################################
 #                            Return of Control                                 #
 ################################################################################
 EOF
-#   export BHASH=$(grep "BUNDLE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
-#   export MHASH=$(grep "MODULE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
-#   export DATETIME=$(grep "DATETIME=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
-#   export SHIP='true'
-#   if [ -z "${BHASH}" ]; then SHIP='false'; fi
-#   if [ -z "${MHASH}" ]; then SHIP='false'; fi
-#   if [ -z "${DATETIME}" ]; then SHIP='false'; fi
+   export BHASH=$(grep "BUNDLE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+   export MHASH=$(grep "MODULE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+   export DATETIME=$(grep "DATETIME=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+   export SHIP='true'
+   if [ -z "${BHASH}" ]; then SHIP='false'; fi
+   if [ -z "${MHASH}" ]; then SHIP='false'; fi
+   if [ -z "${DATETIME}" ]; then SHIP='false'; fi
+echo "SHIP? $SHIP"
 #   sed -e "s/~BHASH~/${BHASH}/g" -e "s/~MHASH~/${MHASH}/g" -e "s/~DATETIME~/${DATETIME}/g" -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" \
 #       ${SCRIPTDIR}/ro_update.tpl > ${SCRIPTDIR}/ro_update_${DATETIME}
 #   if [ "${SHIP}" == "true" ] ; then
