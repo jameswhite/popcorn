@@ -6,17 +6,22 @@ cat<<EOH
 EOH
 
 if [ -f ~/.popcornrc ]; then 
+    echo "using existing ~/.popcornrc"
     . ~/.popcornrc
 else
+    echo "creating ~/.popcornrc"
+cat<<EOF > ~/.popcornrc
     export POPCORN_TMP="/tmp"
     export KERNEL=2.6.35
     export KSUBVER=13
     export AUFS_BRANCH=aufs2.1-35
     export CONFIG_GIST="446120"
     export BUILD_ROOT="/opt/local/src/"
-    export SSH_PROXY="jameswhite@radon.eftdomain.net"
     export http_proxy=http://squid:3128
     export SQUEEZE_BOX="http://mathie-vagrant-boxes.s3.amazonaws.com/debian_squeeze_32.box"
+EOF
+    chmod 755 ~/.popcornrc
+    . ~/.popcornrc
 fi
 
 cat<<EOH
@@ -46,15 +51,25 @@ if [ "$(hostname -s)" != "popcorn" ]; then
             ( cd ~/vm/vagrant/popcorn; vagrant up )
         fi
     else
+        #( cd ~/vm/vagrant/popcorn; vagrant destroy -f )
         echo "popcorn vm already exists"
     fi
-exit 0;
     ( cd ~/vm/vagrant/popcorn;echo "sudo hostname popcorn"| vagrant ssh -- -A 2>/dev/null )
     ( cd ~/vm/vagrant/popcorn;echo "echo popcorn|sudo tee /etc/hostname" | vagrant ssh -- -A 2>/dev/null )
     ( cd ~/vm/vagrant/popcorn;echo "sudo sed -ie 's/vagrant-debian-squeeze/popcorn/g' /etc/hosts" | vagrant ssh -- -A 2>/dev/null )
     ( cd ~/vm/vagrant/popcorn;echo "sudo mkdir -p /root/.ssh "|vagrant ssh -- -A 2>/dev/null ) 
     ( cd ~/vm/vagrant/popcorn;echo "sudo chmod 750 /root/.ssh "|vagrant ssh -- -A 2>/dev/null ) 
     ( cd ~/vm/vagrant/popcorn;echo "echo $(cat ~/.ssh/*.pub) | sudo tee -a /root/.ssh/authorized_keys"|vagrant ssh -- -A 2>/dev/null ) 
+    if [ -f ~/.popcornrc ]; then 
+        # Copy this script to the virtualbox and sudo execute it...
+         scp -P 2222                               \
+             -o UserKnownHostsFile=/dev/null       \
+             -o StrictHostKeyChecking=no           \
+             -o LogLevel=ERROR                     \
+             -o IdentitiesOnly=yes                 \
+             -i ${HOME}/.vagrant.d/insecure_private_key \
+             ~/.popcornrc vagrant@127.0.0.1:/root/.popcornrc
+    fi
     # Copy this script to the virtualbox and sudo execute it...
      scp -P 2222                               \
          -o UserKnownHostsFile=/dev/null       \
@@ -132,30 +147,11 @@ cat<<EOH
 ################################################################################
 EOH
 # aufs
-ssh-add -l
-echo "-=[ $SSH_PROXY ]=-"
 [ ! -d /var/cache/git ] && mkdir -p /var/cache/git
 (
   cd /var/cache/git
   if [ ! -d /var/cache/git/aufs2-standalone ]; then
-      if [ -z "${SSH_PROXY}" ]; then 
-          git clone git://aufs.git.sourceforge.net/gitroot/aufs/aufs2-standalone.git
-      else 
-          HOSTPART=$(echo ${SSH_PROXY} | sed -e 's/.*@//')
-          ssh-keyscan -t dsa,rsa ${HOSTPART} >> /root/.ssh/known_hosts
-          ssh -fNAL9418:aufs.git.sourceforge.net:9418 ${SSH_PROXY} &
-          export SSHPID=$!
-          LISTEN=""
-          TRIES=0;
-          while [ -z "${LISTEN}" -a ${TRIES} -lt 10 ] ;do 
-              sleep 3 
-              LISTEN=$(netstat -an | grep "LISTEN " | grep 9418)
-              TRIES=$(expr ${TRIES} + 1)
-              echo -n "$i: ${LISTEN}"
-          done
-          git clone git://127.0.0.1/gitroot/aufs/aufs2-standalone.git
-          kill -9 ${SSHPID}
-      fi
+          git clone https://${GITHUB_AUTH_TOKEN}:x-oauth-basic@github.com/fapestniegd/aufs2-standalone.git
   else
       cd /var/cache/git/aufs2-standalone; git pull
   fi 

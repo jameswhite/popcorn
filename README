@@ -5,18 +5,37 @@ custom kernels for aufs-read-write-over-root-on-cryptoloop and other insane layo
 It uses a vagrant vm to do the actual build, then pushes the packages, as well as the initrd, vmlinux, lib/modules/tarball, and config to a stash  (mod_dav) server.
 It also references other repositories on github to get patches to the kernel (aufs is unstable on the default linux kernel)
 
-Usage: curl -k https://raw.github.com/fapestniegd/popcorn/master/bin/popcorn | /bin/bash
+Usage: curl -sk https://raw.github.com/fapestniegd/popcorn/master/bin/popcorn | /bin/bash
 
 Or just download the same, chmod +x it and run it.
 
 What does it do?
 
-It will source a file in your home directory called .popcornrc (if exists) or use some defaults.
+If your hostname IS NOT 'popcorn':
+  * source a file in your home directory called .popcornrc (if exists) or create one using hard-coded defaults if it doesn't exist.
+  * check to see if you have vagrant and virtualbox available
+  * see if you have a debian_squeeze.box in ${POPCORN_TMP} directory, downloading it if absent.
+  * set the virtualbox hostname to popcorn
+  * create an authorized keys file from ~/.ssh/*.pub for root on the vagrant box
+  * copy .popcornrc to the vagrant box to preserve preferences across hosts
+  * the script will then scp itself to the virtualbox and then ssh into the virtualbox and run itself as root
+  * grab some variables from out output log (run.out) and use those to curl the resulting tarball to create a "readonly update" file from a template.
+  * curl -X PUT the readonly update and kernel bundle to a stash (mod_dav) server
+  * exit
+
+If your hostname IS 'popcorn': (which is the name of the virtualbox vm we've just created)
+  * download and install cfengine (optional)
+  * get kernel build dependencies from apt
+  
+  * download the aufs-standalone 
+  * 
+  * echo some variables to the output log (run.out) for parsing by the script running on the host machine
 
 
 
 # .popcornrc example:
 
+export POPCORN_TMP='/tmp'
 export KERNEL=2.6.35
 export KSUBVER=13
 export AUFS_BRANCH=aufs2.1-35
