@@ -154,6 +154,27 @@ EOSL
 
 cat<<EOH
 ################################################################################
+# MIRRORING POPCORN
+################################################################################
+EOH
+[ ! -d /var/cache/git ] && mkdir -p /var/cache/git
+(
+  cd /var/cache/git
+  if [ ! -d /var/cache/git/popcorn ]; then
+      echo "git clone https://${GITHUB_AUTH_TOKEN}github.com/fapestniegd/popcorn.git"
+      git clone https://${GITHUB_AUTH_TOKEN}github.com/fapestniegd/popcorn.git
+  else
+      cd /var/cache/git/popcorn; git pull
+  fi 
+  cd /var/cache/git/popcorn
+  VERSIONS=$(git branch -r | grep 'aufs2.1-' | sed -e 's/.*origin\///')
+  for v in $(echo "${VERSIONS}"); do
+      git checkout ${v} || git checkout -b ${v} origin/${v}
+  done
+)
+
+cat<<EOH
+################################################################################
 # AUFS
 ################################################################################
 EOH
