@@ -109,8 +109,8 @@ EOF
     if [ "$SHIP" == "true" ]; then
         curl -sk https://raw.github.com/fapestniegd/popcorn/master/etc/templates/ro_update.tpl |     \
             sed -e "s/~BHASH~/${BHASH}/g" -e "s/~MHASH~/${MHASH}/g" -e "s/~DATETIME~/${DATETIME}/g" \
-                -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" > ${SCRIPTDIR}/ro_update_${DATETIME}
-        curl --insecure -X PUT -T "${SCRIPTDIR}/ro_update_${DATETIME}" "https://stash.eftdomain.net/kernel_bundles/ro_update_${DATETIME}"
+                -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" > /var/tmp/ro_update_${DATETIME}
+        curl --insecure -X PUT -T "/var/tmp/ro_update_${DATETIME}" "https://stash.eftdomain.net/kernel_bundles/${DATETIME}/ro_update_${DATETIME}"
     fi
     # optionaly destrou
     # ( cd ~/vm/vagrant/popcorn; vagrant halt )
@@ -374,10 +374,10 @@ cat<<EOF
 ################################################################################
 EOF
 curl --insecure -X PUT -T ${BUNDLE}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz \
-    ${STASH_SERVER_URI}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}-${DATETIME}.tgz
+    ${STASH_SERVER_URI}/kernel_bundles/${DATETIME}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz
 # the kernel packages
 for file in $(cd /opt/local/src; ls *.deb); do
-    curl --insecure -X PUT -T /opt/local/src/${file} ${STASH_SERVER_URI}/kernel-packages/${DATETIME}/${file}
+    curl --insecure -X PUT -T /opt/local/src/${file} ${STASH_SERVER_URI}/kernel_packages/${DATETIME}/${file}
 done
 
 # the

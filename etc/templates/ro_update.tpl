@@ -5,7 +5,7 @@
 export http_proxy=http://10.100.0.6:3128
 BUNDLE_HASH='~BHASH~'
 MODULE_HASH='~MHASH~'
-wget --no-check-certificate -O /tmp/kernel-bundle-~KERNEL~-net5501.tgz https://stash.eftdomain.net/kernel_bundles/kernel-bundle-~KERNEL~-net5501-~DATETIME~.tgz
+wget --no-check-certificate -O /tmp/kernel-bundle-~KERNEL~-net5501.tgz https://stash.eftdomain.net/~DATETIME~/kernel_bundles/kernel-bundle-~KERNEL~-net5501.tgz
 
 EXIT=1;
 ################################################################################
