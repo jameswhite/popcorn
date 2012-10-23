@@ -26,18 +26,29 @@ If your hostname IS NOT 'popcorn':
 If your hostname IS 'popcorn': (which is the name of the virtualbox vm we've just created)
   * download and install cfengine (optional)
   * get kernel build dependencies from apt
-  
-  * download the aufs-standalone 
-  * 
+  * get kernel source
+  * mirrors the popcorn repository from github
+  * download the aufs-standalone repostitory from github
+  * copy the kernel build config into the kernel source tree
+  * enable aufs in the kernel
+  * build the kernel
+  * install the kernel, and kernel headers on the virtualbox
+  * prep the initramfs-tools from the popcorn repository so that we can build custom initial ram disks
+  * create and inspect the custom soekris initrd.
+  * bundle up the kernel, config, system-map, initrd, and modules
   * echo some variables to the output log (run.out) for parsing by the script running on the host machine
-
-
 
 # .popcornrc example:
 
-export POPCORN_TMP='/tmp'
-export KERNEL=2.6.35
-export KSUBVER=13
-export AUFS_BRANCH=aufs2.1-35
-export GITHUB_READONLY_TOKEN="1485723c684fdf8b788fe221904891b8851ee1a5"
+    export POPCORN_TMP="/tmp" 
+    export KERNEL=2.6.35
+    export KSUBVER=13
+    export AUFS_BRANCH=aufs2.1-35
+    export CONFIG_GIST="446120"  
+    export BUILD_ROOT="/opt/local/src/"
+    export http_proxy=http://squid.eftdomain.net:3128
+    export https_proxy=http://squid.eftdomain.net:3128
+    export SQUEEZE_BOX="http://mathie-vagrant-boxes.s3.amazonaws.com/debian_squeeze_32.box"
+    export GITHUB_AUTH_TOKEN="defaceddeadbeeffacadebeefacedace12345678:x-oauth-basic@"
+    export DEBIAN_MIRROR="ftp.us.debian.org"
 
