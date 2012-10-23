@@ -106,14 +106,15 @@ EOF
    if [ -z "${BHASH}" ]; then SHIP='false'; fi
    if [ -z "${MHASH}" ]; then SHIP='false'; fi
    if [ -z "${DATETIME}" ]; then SHIP='false'; fi
-echo "SHIP? $SHIP"
-#   sed -e "s/~BHASH~/${BHASH}/g" -e "s/~MHASH~/${MHASH}/g" -e "s/~DATETIME~/${DATETIME}/g" -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" \
-#       ${SCRIPTDIR}/ro_update.tpl > ${SCRIPTDIR}/ro_update_${DATETIME}
-#   if [ "${SHIP}" == "true" ] ; then
-#       curl --insecure -X PUT -T "${SCRIPTDIR}/ro_update_${DATETIME}" "https://stash.eftdomain.net/kernel_bundles/ro_update_${DATETIME}"
-#   fi
-#    ( cd ~/vm/vagrant/popcorn; vagrant halt )
-#    ( cd ~/vm/vagrant/popcorn; yes | vagrant destroy --force )
+    if [ "$SHIP" == "true" ]; then
+        curl -sk https://raw.github.com/fapestniegd/popcorn/master/etc/templates/ro_update.tpl |     \
+            sed -e "s/~BHASH~/${BHASH}/g" -e "s/~MHASH~/${MHASH}/g" -e "s/~DATETIME~/${DATETIME}/g" \
+                -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" > ${SCRIPTDIR}/ro_update_${DATETIME}
+        curl --insecure -X PUT -T "${SCRIPTDIR}/ro_update_${DATETIME}" "https://stash.eftdomain.net/kernel_bundles/ro_update_${DATETIME}"
+    fi
+    # optionaly destrou
+    # ( cd ~/vm/vagrant/popcorn; vagrant halt )
+    # ( cd ~/vm/vagrant/popcorn; yes | vagrant destroy -f )
     exit 0;
 fi
 cat<<EOH
@@ -309,6 +310,8 @@ EOH
 ( cd /etc/initramfs-tools; git branch | grep '* master' || git checkout master )
 echo 'do_initrd = Yes' > /etc/kernel-img.conf
 dpkg -i ${BUILD_ROOT}/linux-image-${KERNEL}.${KSUBVER}*.deb
+mkinitramfs -o /boot/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}
+update-grub
 
 cat<<EOH
 ################################################################################
@@ -326,7 +329,7 @@ rsync -avzPC --delete --exclude .git /var/cache/git/popcorn/etc/initramfs-tools/
 ( cd /etc/initramfs-tools; find * -type f -exec git add {} \; )
 ( cd /etc/initramfs-tools; git commit -a -m "rsync'ed from popcorn" )
 
-mkinitramfs -o /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}
+( cd /etc/initramfs-tools; git branch | grep '* master' || git checkout master )
 
 cat<<EOH
 ################################################################################
@@ -351,10 +354,6 @@ echo "initrd exited with ${EXIT}"
 [ -d "${IRDTMP}" ] && rm -fr "${IRDTMP}"
 ( cd /etc/initramfs-tools; git branch | grep '* master' || git checkout master )
 
-#------------------------------------------------------------------------------#
-exit 0;
-#------------------------------------------------------------------------------#
-
 cat<<EOH
 ################################################################################
 # bundle up the kernel, config, system-map, initrd, and modules
@@ -375,8 +374,13 @@ cat<<EOF
 ################################################################################
 EOF
 curl --insecure -X PUT -T ${BUNDLE}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz \
-    https://stash.eftdomain.net/kernel_bundles/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}-${DATETIME}.tgz
+    ${STASH_SERVER_URI}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}-${DATETIME}.tgz
+# the kernel packages
+for file in $(cd /opt/local/src; ls *.deb); do
+    curl --insecure -X PUT -T /opt/local/src/${file} ${STASH_SERVER_URI}/kernel-packages/${DATETIME}/${file}
+done
 
+# the
 echo
 echo "DATETIME='${DATETIME}'"
 echo "BUNDLE_HASH='${BHASH}'"
