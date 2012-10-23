@@ -322,19 +322,18 @@ fi
 ( cd /etc/initramfs-tools; git branch | grep soekris     || git branch soekris )
 ( cd /etc/initramfs-tools; git branch | grep '* soekris' || git checkout soekris )
 
-rsync -avzPC --delete --exclude .git /var/cache/git/popcorn/etc/initramfs-scripts/ /etc/initramfs-tools/
+rsync -avzPC --delete --exclude .git /var/cache/git/popcorn/etc/initramfs-tools/ /etc/initramfs-tools/
 ( cd /etc/initramfs-tools; find * -type f -exec git add {} \; )
-( cd /etc/initramfs-tools; git commit -a -m "cloned from github" )
+( cd /etc/initramfs-tools; git commit -a -m "rsync'ed from popcorn" )
 
-mkinitramfs -o /var/tmp/initrd.img-${KERNEL}.${KSUBVER} ${KERNEL}.${KSUBVER}
-
-
+mkinitramfs -o /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}
 
 cat<<EOH
 ################################################################################
 # create and inspect the initrd
 ################################################################################
 EOH
+
 ( cd /etc/initramfs-tools; git branch | grep '* soekris' || git checkout soekris )
 mkinitramfs -o /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}
 
