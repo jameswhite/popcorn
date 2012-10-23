@@ -300,56 +300,32 @@ cat<<EOH
 ################################################################################
 EOH
 ( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg clean )
-(cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version "-net-5501" --revision 2 kernel_image kernel_source kernel_headers kernel_doc )
+( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version "-net-5501" --revision 3 kernel_image kernel_source kernel_headers kernel_doc )
 
-#------------------------------------------------------------------------------#
-exit 0;
-#------------------------------------------------------------------------------#
+# install this kernel and initrd on this virtualbox
+( cd /etc/initramfs-tools; git branch | grep '* master' || git checkout master )
+echo 'do_initrd = Yes' > /etc/kernel-img.conf
+dpkg -i ${BUILD_ROOT}/linux-image-${KERNEL}.${KSUBVER}*.deb
 
 cat<<EOH
 ################################################################################
-# prepping initramfs-tools
+# prepping initramfs-tools for soekris build
 ################################################################################
 EOH
 apt-get install -y initramfs-tools
 if [ ! -d /etc/initramfs-tools/.git ]; then 
     ( cd /etc/initramfs-tools; git init; find * -type f -exec git add {} \;; git commit -a -m "addding initial files"; )
 fi
-( cd /etc/initramfs-tools; git branch | grep soekris  || git branch soekris )
+( cd /etc/initramfs-tools; git branch | grep soekris     || git branch soekris )
 ( cd /etc/initramfs-tools; git branch | grep '* soekris' || git checkout soekris )
 
-GITTMP=$(mktemp -d /var/tmp/git.XXXX)
-cd ${GITTMP}
-if [ -z "${SSH_PROXY}" ]; then
-    git clone git://github.com/fapestniegd/initramfs-scripts.git
-else
-    HOSTPART=$(echo ${SSH_PROXY} | sed -e 's/.*@//')
-    ssh-keyscan -t dsa,rsa ${HOSTPART} >> /root/.ssh/known_hosts
-    ssh -fNAL9418:github.com:9418 ${SSH_PROXY} &
-    export SSHPID=$!
-    LISTEN=""
-    TRIES=0;
-    while [ -z "${LISTEN}" -a ${TRIES} -lt 10 ] ;do
-        sleep 3
-        LISTEN=$(netstat -an | grep "LISTEN " | grep 9418)
-        TRIES=$(expr ${TRIES} + 1)
-        echo -n "$i: ${LISTEN}"
-    done
-    git clone git://127.0.0.1/fapestniegd/initramfs-scripts.git
-    kill -9 ${SSHPID}
-fi
-cd 
-rsync -avzPC --delete --exclude .git ${GITTMP}/initramfs-scripts/ /etc/initramfs-tools/
-(cd /etc/initramfs-tools; find * -type f -exec git add {} \;)
-(cd /etc/initramfs-tools; git commit -a -m "cloned from github" )
-[ -d "${GITTMP}" ] && rm -fr "${GITTMP}"
+rsync -avzPC --delete --exclude .git /var/cache/git/popcorn/etc/initramfs-scripts/ /etc/initramfs-tools/
+( cd /etc/initramfs-tools; find * -type f -exec git add {} \; )
+( cd /etc/initramfs-tools; git commit -a -m "cloned from github" )
 
-# Don't do this.
-# mkinitramfs -o /var/tmp/initrd.img-$(uname -r) $(uname -r)
+mkinitramfs -o /var/tmp/initrd.img-${KERNEL}.${KSUBVER} ${KERNEL}.${KSUBVER}
 
-# revert to the system initrd so we don't brick our virtualbox, and install our new kernels
-( cd /etc/initramfs-tools; git branch | grep '* master' || git checkout master )
-dpkg -i ${BUILD_ROOT}/linux-image-${KERNEL}.${KSUBVER}*.deb
+
 
 cat<<EOH
 ################################################################################
@@ -372,6 +348,10 @@ EXIT=$?
 echo "initrd exited with ${EXIT}"
 [ -d "${IRDTMP}" ] && rm -fr "${IRDTMP}"
 ( cd /etc/initramfs-tools; git branch | grep '* master' || git checkout master )
+
+#------------------------------------------------------------------------------#
+exit 0;
+#------------------------------------------------------------------------------#
 
 cat<<EOH
 ################################################################################
