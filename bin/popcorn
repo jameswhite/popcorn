@@ -299,7 +299,9 @@ cat<<EOH
 # BUILDING THE PACKAGE (optional, non-aufs, to ensure everything up to here works)
 ################################################################################
 EOH
-[ -z "${REVISION}" ] && REVISION=1
+
+[ -z "${APPEND_VERSION}" ] && APPEND_VERSION='-net5501'
+[ -z "${REVISION}" ]       && REVISION=1
 ( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg clean )
 ( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version "${APPEND_VERSION}" --revision ${REVISION} kernel_image kernel_source kernel_headers kernel_doc )
 
