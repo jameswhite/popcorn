@@ -16,3 +16,4 @@ aufs
 tmpfs
 usb-storage
 cs5535_gpio
+rhinefet

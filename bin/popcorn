@@ -313,6 +313,19 @@ dpkg -i ${BUILD_ROOT}/linux-image-${KERNEL}.${KSUBVER}*.deb
 mkinitramfs -o /boot/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}
 update-grub
 
+# we need to copy a "stage 2" script out to run on reboot
+
+# we need to reboot here
+
+# after reboot:
+
+# we need to download and build rhinefet here
+# git clone https://github.com/fapestniegd/rhinefet.git     
+# cd /var/cache/git/rhinefet; make
+# install -m 0755 /var/cache/git/rhinefet/rhinefet.ko /lib/modules/${KERNEL}.${KSUBVER}${APPEND_VERSION}/kernel/drivers/net
+# depmod -a
+# grep -q rhinefet /etc/modules || echo "rhinefet" >> /etc/modules
+
 cat<<EOH
 ################################################################################
 # prepping initramfs-tools for soekris build
@@ -359,6 +372,7 @@ cat<<EOH
 # bundle up the kernel, config, system-map, initrd, and modules
 ################################################################################
 EOH
+
 export BUNDLE=$(mktemp -d /var/tmp/kernel_bundle.XXXX);
 (cd /lib/modules; tar cvzf ${BUNDLE}/modules-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}) 
 MHASH=$(sha1sum ${BUNDLE}/modules-${KERNEL}.${KSUBVER}${APPEND_VERSION}|awk '{print $1}')
@@ -368,6 +382,7 @@ cp /var/tmp/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${BUNDLE}/
 (cd ${BUNDLE}; tar cvzf kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz *)
 BHASH=$(sha1sum ${BUNDLE}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz | awk '{print $1}')
 export DATETIME=$(date +'%Y%m%d%H%M')
+
 cat<<EOF
 ################################################################################
 #                                 Shipping...                                  #
