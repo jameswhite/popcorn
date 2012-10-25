@@ -25,6 +25,13 @@ EOF
     . ~/.popcornrc
 fi
 
+################################################################################################################################################################
+# STAGE 1
+################################################################################################################################################################
+if [ "$(uname -r)" != "${KERNEL}.${KSUBVER}${APPEND_VERSION}" ]; then
+cp /etc/rc.local /etc/rc.local.dist
+echo "$(dirname $0)/$(basename $0)" >> /etc/rc.local
+
 cat<<EOH
 ################################################################################
 # install a vm named popcorn to cook our kernel
@@ -242,29 +249,26 @@ cat<<EOH
 ################################################################################
 EOH
 OLDCONFIG_EXIT=0; # if we don't run it, assume it exited 0
-if [ ! -f /var/tmp/config-${KERNEL}.${KSUBVER} ]; then
-    if [ -f /var/cache/popcorn/conf/config-${KERNEL}.${KSUBVER} ]; then
-        echo "Using config-${KERNEL}.${KSUBVER} from popcorn/conf"
-        cp /var/cache/popcorn/conf/config-${KERNEL}.${KSUBVER} ${BUILD_ROOT}/linux/.config
-    else
-        echo "no specific config found. Using default config"
-        cp /var/cache/popcorn/conf/config.orig ${BUILD_ROOT}/linux/.config
-        (cd $BUILD_ROOT/linux; make oldconfig)
-        OLDCONFIG_EXIT=$?
-        # copy the new one with an append version line to /var/tmp
-        echo "# APPEND_VERSION='-net5501'"  > /var/tmp/config-${KERNEL}.${KSUBVER}
-        echo "#"                           >> /var/tmp/config-${KERNEL}.${KSUBVER}
-        cat ${BUILD_ROOT}/.config          >> /var/tmp/config-${KERNEL}.${KSUBVER}
-        if [ ! -z "${GISTROOT}" ]; then rm -fr "${GISTROOT}"; fi
-    fi
+if [ -f /var/cache/git/popcorn/conf/config-${KERNEL}.${KSUBVER} ]; then
+    echo "Using config-${KERNEL}.${KSUBVER} from popcorn/conf"
+    cp /var/cache/git/popcorn/conf/config-${KERNEL}.${KSUBVER} ${BUILD_ROOT}/linux/.config
 else
-    echo "Using /var/tmp/config-${KERNEL}.${KSUBVER}"
-    cp /var/tmp/config-${KERNEL}.${KSUBVER} cp ${BUILD_ROOT}/linux/.config
+    echo "no specific config found. Using default config"
+    cp /var/cache/git/popcorn/conf/config.orig ${BUILD_ROOT}/linux/.config
+    (cd $BUILD_ROOT/linux; make oldconfig)
+    OLDCONFIG_EXIT=$?
+    # copy the new one with an append version line to /var/tmp
+    echo "# APPEND_VERSION='-net5501'"  > /var/tmp/config-${KERNEL}.${KSUBVER}
+    echo "#"                           >> /var/tmp/config-${KERNEL}.${KSUBVER}
+    cat ${BUILD_ROOT}/.config          >> /var/tmp/config-${KERNEL}.${KSUBVER}
+    if [ ! -z "${GISTROOT}" ]; then rm -fr "${GISTROOT}"; fi
 fi
+
 if [ ${OLDCONFIG_EXIT} -ne 0 ];then 
     echo "something went wrong with 'make oldconfig' Aborting..."
     exit 1
 fi
+
 if [ ${OLDCONFIG_EXIT} -ne 0 ];then 
     grep "CONFIG_AUFS_FS" ${BUILD_ROOT}/linux/.config || \
     (
@@ -294,7 +298,6 @@ if [ ${OLDCONFIG_EXIT} -ne 0 ];then
     ) 
 fi
 
-
 cat<<EOH
 ################################################################################
 # BUILDING THE PACKAGE (optional, non-aufs, to ensure everything up to here works)
@@ -313,17 +316,34 @@ dpkg -i ${BUILD_ROOT}/linux-image-${KERNEL}.${KSUBVER}*.deb
 mkinitramfs -o /boot/initrd.img-${KERNEL}.${KSUBVER}${APPEND_VERSION} ${KERNEL}.${KSUBVER}${APPEND_VERSION}
 update-grub
 
-# we need to copy a "stage 2" script out to run on reboot
+cat<<EOH
+################################################################################
+# rebooting into ${KERNEL}.${KSUBVER}${APPEND_VERSION}
+################################################################################
+EOH
 
-# we need to reboot here
+reboot 
 
-# after reboot:
+################################################################################################################################################################
+# STAGE 2
+################################################################################################################################################################
+else
+mv /etc/rc.local.dist /etc/rc.local
+cat<<EOH
+################################################################################
+# building rhinefet module
+################################################################################
+EOH
 
 # we need to download and build rhinefet here
-# git clone https://github.com/fapestniegd/rhinefet.git     
-# cd /var/cache/git/rhinefet; make
-# install -m 0755 /var/cache/git/rhinefet/rhinefet.ko /lib/modules/${KERNEL}.${KSUBVER}${APPEND_VERSION}/kernel/drivers/net
-# depmod -a
+if [ ! -d /var/cache/git/rhinefet ]; then
+    (cd /var/cache/git; git clone https://github.com/fapestniegd/rhinefet.git)
+else
+    (cd /var/cache/git/rhinefet; git pull)
+fi
+cd /var/cache/git/rhinefet; make
+install -m 0755 /var/cache/git/rhinefet/rhinefet.ko /lib/modules/${KERNEL}.${KSUBVER}${APPEND_VERSION}/kernel/drivers/net
+depmod -a
 # grep -q rhinefet /etc/modules || echo "rhinefet" >> /etc/modules
 
 cat<<EOH
@@ -331,6 +351,7 @@ cat<<EOH
 # prepping initramfs-tools for soekris build
 ################################################################################
 EOH
+
 apt-get install -y initramfs-tools
 if [ ! -d /etc/initramfs-tools/.git ]; then 
     ( cd /etc/initramfs-tools; git init; find * -type f -exec git add {} \;; git commit -a -m "addding initial files"; )
@@ -388,6 +409,7 @@ cat<<EOF
 #                                 Shipping...                                  #
 ################################################################################
 EOF
+
 curl --insecure -X PUT -T ${BUNDLE}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz \
     ${STASH_SERVER_URI}/kernel_bundles/${DATETIME}/kernel-bundle-${KERNEL}.${KSUBVER}${APPEND_VERSION}.tgz
 # the kernel packages
@@ -401,6 +423,7 @@ echo "DATETIME='${DATETIME}'"
 echo "BUNDLE_HASH='${BHASH}'"
 echo "MODULE_HASH='${MHASH}'"
 echo
+
 cat<<EOF
 ################################################################################
 #                                End Payload                                   #
@@ -408,3 +431,4 @@ cat<<EOF
 
 EOF
 exit 0;
+fi
