@@ -30,7 +30,15 @@ fi
 ################################################################################################################################################################
 if [ "$(uname -r)" != "${KERNEL}.${KSUBVER}${APPEND_VERSION}" ]; then
 cp /etc/rc.local /etc/rc.local.dist
-echo "$(dirname $0)/$(basename $0)" >> /etc/rc.local
+grep "$(dirname $0)/$(basename $0)" /etc/rc.local 
+if [ $? -eq 0 ]; then
+cat<<EOF > /etc/rc.local 
+[ -f /root/.popcornrc ] && . /root/.popcornrc
+if [ "$(uname -r)" != "${KERNEL}.${KSUBVER}${APPEND_VERSION}" ]; then
+    $(dirname $0)/$(basename $0)"
+fi
+EOF
+chmod 755 /etc/rc.local
 
 cat<<EOH
 ################################################################################
