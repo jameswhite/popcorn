@@ -25,23 +25,6 @@ EOF
     . ~/.popcornrc
 fi
 
-################################################################################################################################################################
-# STAGE 1
-################################################################################################################################################################
-if [ "$(uname -r)" != "${KERNEL}.${KSUBVER}${APPEND_VERSION}" ]; then
-cp /etc/rc.local /etc/rc.local.dist
-grep "$(dirname $0)/$(basename $0)" /etc/rc.local 
-
-if [ $? -eq 0 ]; then
-cat<<EOF > /etc/rc.local 
-[ -f /root/.popcornrc ] && . /root/.popcornrc
-if [ "$(uname -r)" != "${KERNEL}.${KSUBVER}${APPEND_VERSION}" ]; then
-    $(dirname $0)/$(basename $0)"
-fi
-EOF
-chmod 755 /etc/rc.local
-fi
-
 cat<<EOH
 ################################################################################
 # install a vm named popcorn to cook our kernel
@@ -135,6 +118,7 @@ EOF
 #    # ( cd ~/vm/vagrant/popcorn; yes | vagrant destroy -f )
     exit 0;
 fi
+
 cat<<EOH
 ################################################################################
 ################################################################################
@@ -145,6 +129,23 @@ cat<<EOH
 ################################################################################
 EOH
 export http_proxy=http://squid.eftdomain.net:3128
+
+################################################################################################################################################################
+# STAGE 1
+################################################################################################################################################################
+if [ "$(uname -r)" != "${KERNEL}.${KSUBVER}${APPEND_VERSION}" ]; then
+cp /etc/rc.local /etc/rc.local.dist
+grep "$(dirname $0)/$(basename $0)" /etc/rc.local 
+
+if [ $? -eq 0 ]; then
+cat<<EOF > /etc/rc.local 
+[ -f /root/.popcornrc ] && . /root/.popcornrc
+if [ "$(uname -r)" != "${KERNEL}.${KSUBVER}${APPEND_VERSION}" ]; then
+    $(dirname $0)/$(basename $0)"
+fi
+EOF
+chmod 755 /etc/rc.local
+fi
 
 cat<<EOH
 ################################################################################
