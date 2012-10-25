@@ -106,22 +106,23 @@ cat<<EOF
 #                            Return of Control                                 #
 ################################################################################
 EOF
-   export BHASH=$(grep "BUNDLE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
-   export MHASH=$(grep "MODULE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
-   export DATETIME=$(grep "DATETIME=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
-   export SHIP='true'
-   if [ -z "${BHASH}" ]; then SHIP='false'; fi
-   if [ -z "${MHASH}" ]; then SHIP='false'; fi
-   if [ -z "${DATETIME}" ]; then SHIP='false'; fi
-    if [ "$SHIP" == "true" ]; then
-        curl -sk https://raw.github.com/fapestniegd/popcorn/master/etc/templates/ro_update.tpl |     \
-            sed -e "s/~BHASH~/${BHASH}/g" -e "s/~MHASH~/${MHASH}/g" -e "s/~DATETIME~/${DATETIME}/g" \
-                -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" > /var/tmp/ro_update_${DATETIME}
-        curl --insecure -X PUT -T "/var/tmp/ro_update_${DATETIME}" "https://stash.eftdomain.net/kernel_bundles/${DATETIME}/ro_update_${DATETIME}"
-    fi
-    # optionaly destrou
-    # ( cd ~/vm/vagrant/popcorn; vagrant halt )
-    # ( cd ~/vm/vagrant/popcorn; yes | vagrant destroy -f )
+
+#   export BHASH=$(grep "BUNDLE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+#   export MHASH=$(grep "MODULE_HASH=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+#   export DATETIME=$(grep "DATETIME=" ~/vm/vagrant/popcorn/run.out | sed -e 's/.*=//' -e "s/'//g")
+#   export SHIP='true'
+#   if [ -z "${BHASH}" ]; then SHIP='false'; fi
+#   if [ -z "${MHASH}" ]; then SHIP='false'; fi
+#   if [ -z "${DATETIME}" ]; then SHIP='false'; fi
+#    if [ "$SHIP" == "true" ]; then
+#        curl -sk https://raw.github.com/fapestniegd/popcorn/master/etc/templates/ro_update.tpl |     \
+#            sed -e "s/~BHASH~/${BHASH}/g" -e "s/~MHASH~/${MHASH}/g" -e "s/~DATETIME~/${DATETIME}/g" \
+#                -e "s/~KERNEL~/${KERNEL}.${KSUBVER}/g" > /var/tmp/ro_update_${DATETIME}
+#        curl --insecure -X PUT -T "/var/tmp/ro_update_${DATETIME}" "https://stash.eftdomain.net/kernel_bundles/${DATETIME}/ro_update_${DATETIME}"
+#    fi
+#    # optionaly destrou
+#    # ( cd ~/vm/vagrant/popcorn; vagrant halt )
+#    # ( cd ~/vm/vagrant/popcorn; yes | vagrant destroy -f )
     exit 0;
 fi
 cat<<EOH
