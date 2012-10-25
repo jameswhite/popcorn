@@ -262,19 +262,12 @@ EOH
 OLDCONFIG_EXIT=0; # if we don't run it, assume it exited 0
 if [ -f /var/cache/git/popcorn/conf/config-${KERNEL}.${KSUBVER} ]; then
     echo "Using config-${KERNEL}.${KSUBVER} from popcorn/conf"
-    cp /var/cache/git/popcorn/conf/config-${KERNEL}.${KSUBVER} ${BUILD_ROOT}/linux/.config
 else
     echo "no specific config found. Using default config"
     cp /var/cache/git/popcorn/conf/config.orig ${BUILD_ROOT}/linux/.config
     (cd $BUILD_ROOT/linux; make oldconfig)
     OLDCONFIG_EXIT=$?
-    # copy the new one with an append version line to /var/tmp
-    echo "# APPEND_VERSION='-net5501'"  > /var/tmp/config-${KERNEL}.${KSUBVER}
-    echo "#"                           >> /var/tmp/config-${KERNEL}.${KSUBVER}
-    cat ${BUILD_ROOT}/.config          >> /var/tmp/config-${KERNEL}.${KSUBVER}
-    if [ ! -z "${GISTROOT}" ]; then rm -fr "${GISTROOT}"; fi
 fi
-
 if [ ${OLDCONFIG_EXIT} -ne 0 ];then 
     echo "something went wrong with 'make oldconfig' Aborting..."
     exit 1
