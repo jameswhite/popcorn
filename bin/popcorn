@@ -29,6 +29,8 @@ fi
 # STAGE 1
 ################################################################################################################################################################
 if [ "$(uname -r)" != "${KERNEL}.${KSUBVER}${APPEND_VERSION}" ]; then
+
+
 cp /etc/rc.local /etc/rc.local.dist
 grep "$(dirname $0)/$(basename $0)" /etc/rc.local 
 if [ $? -eq 0 ]; then
@@ -39,6 +41,7 @@ if [ "$(uname -r)" != "${KERNEL}.${KSUBVER}${APPEND_VERSION}" ]; then
 fi
 EOF
 chmod 755 /etc/rc.local
+fi
 
 cat<<EOH
 ################################################################################
