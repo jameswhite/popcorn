@@ -15,7 +15,6 @@ cat<<EOF > ~/.popcornrc
     export KERNEL=2.6.35
     export KSUBVER=13
     export AUFS_BRANCH=aufs2.1-35
-    export CONFIG_GIST="446120"
     export BUILD_ROOT="/opt/local/src/"
     export http_proxy=http://squid:3128
     export SQUEEZE_BOX="http://mathie-vagrant-boxes.s3.amazonaws.com/debian_squeeze_32.box"
@@ -306,9 +305,10 @@ cat<<EOH
 ################################################################################
 EOH
 
-[ -z "${APPEND_VERSION}" ] && APPEND_VERSION='-net5501'
+[ -z "${APPEND_VERSION}" ] && APPEND_VERSION='-net5501-rf'
 [ -z "${REVISION}" ]       && REVISION=1
 ( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg clean )
+sed -ie 's/CONFIG_VIA_RHINE=.*/# CONFIG_VIA_RHINE is not set/'  ${BUILD_ROOT}/linux/.config
 ( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version "${APPEND_VERSION}" --revision ${REVISION} kernel_image kernel_source kernel_headers kernel_doc )
 
 # install this kernel and initrd on this virtualbox
@@ -337,6 +337,7 @@ cat<<EOH
 ################################################################################
 EOH
 
+. ~/.popcornrc
 # we need to download and build rhinefet here
 if [ ! -d /var/cache/git/rhinefet ]; then
     (cd /var/cache/git; git clone https://github.com/fapestniegd/rhinefet.git)
