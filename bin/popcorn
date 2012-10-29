@@ -259,9 +259,12 @@ EOH
 OLDCONFIG_EXIT=0; # if we don't run it, assume it exited 0
 if [ -f /var/cache/git/popcorn/conf/config-${KERNEL}.${KSUBVER} ]; then
     echo "Using config-${KERNEL}.${KSUBVER} from popcorn/conf"
+    cp /var/cache/git/popcorn/conf/config-${KERNEL}.${KSUBVER} ${BUILD_ROOT}/linux/.config
+    sed -ie 's/^CONFIG_VIA_RHINE=.*/# CONFIG_VIA_RHINE is not set/'  ${BUILD_ROOT}/linux/.config # force this shit
 else
     echo "no specific config found. Using default config"
     cp /var/cache/git/popcorn/conf/config.orig ${BUILD_ROOT}/linux/.config
+    sed -ie 's/^CONFIG_VIA_RHINE=.*/# CONFIG_VIA_RHINE is not set/'  ${BUILD_ROOT}/linux/.config # force this shit
     (cd $BUILD_ROOT/linux; make oldconfig)
     OLDCONFIG_EXIT=$?
 fi
@@ -308,7 +311,6 @@ EOH
 [ -z "${APPEND_VERSION}" ] && APPEND_VERSION='-net5501-rf'
 [ -z "${REVISION}" ]       && REVISION=1
 ( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg clean )
-sed -ie 's/CONFIG_VIA_RHINE=.*/# CONFIG_VIA_RHINE is not set/'  ${BUILD_ROOT}/linux/.config
 ( cd ${BUILD_ROOT}/linux ;fakeroot make-kpkg --append-to-version "${APPEND_VERSION}" --revision ${REVISION} kernel_image kernel_source kernel_headers kernel_doc )
 
 # install this kernel and initrd on this virtualbox
